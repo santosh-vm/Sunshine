@@ -1,5 +1,9 @@
 package android.santosh.com.sunshine.utils;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
+import android.santosh.com.sunshine.R;
 import android.text.format.Time;
 import android.util.Log;
 
@@ -15,6 +19,10 @@ import java.text.SimpleDateFormat;
  */
 public class JSONDataExtractor {
     private static String LOG_TAG = JSONDataExtractor.class.getSimpleName();
+    private Context context;
+    public JSONDataExtractor(Context context){
+        this.context = context;
+    }
     /* The date/time conversion code is going to be moved outside the asynctask later,
          * so for convenience we're breaking it out into its own method now.
          */
@@ -28,7 +36,13 @@ public class JSONDataExtractor {
     /**
      * Prepare the weather high/lows for presentation.
      */
-    private String formatHighLows(double high, double low) {
+    private String formatHighLows(double high, double low, String unitType) {
+        if (unitType.equals(context.getString(R.string.pref_units_imperial))) {
+            high = (high * 1.8) + 32;
+            low = (low * 1.8) + 32;
+        } else if (!unitType.equals(context.getString(R.string.pref_units_metric))) {
+            Log.d(LOG_TAG, "Unit type not found: " + unitType);
+        }
         // For presentation, assume the user doesn't care about tenths of a degree.
         long roundedHigh = Math.round(high);
         long roundedLow = Math.round(low);
@@ -76,6 +90,14 @@ public class JSONDataExtractor {
         dayTime = new Time();
 
         String[] resultStrs = new String[numDays];
+
+        // Data is fetched in Celsius by default.
+        // If user prefers to see in Fahrenheit, convert the values here.
+        // We do this rather than fetching in Fahrenheit so that the user can
+        // change this option without us having to re-fetch the data once
+        // we start storing the values in a database.
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String unitType = sharedPrefs.getString(context.getString(R.string.pref_units_key),context.getString(R.string.pref_units_metric));
         for(int i = 0; i < weatherArray.length(); i++) {
             // For now, using the format "Day, description, hi/low"
             String day;
@@ -103,7 +125,7 @@ public class JSONDataExtractor {
             double high = temperatureObject.getDouble(OWM_MAX);
             double low = temperatureObject.getDouble(OWM_MIN);
 
-            highAndLow = formatHighLows(high, low);
+            highAndLow = formatHighLows(high, low, unitType);
             resultStrs[i] = day + " - " + description + " - " + highAndLow;
         }
 

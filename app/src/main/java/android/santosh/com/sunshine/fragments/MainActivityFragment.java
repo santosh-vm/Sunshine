@@ -1,22 +1,29 @@
 package android.santosh.com.sunshine.fragments;
 
 
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.santosh.com.sunshine.R;
+import android.santosh.com.sunshine.activity.DetailActivity;
 import android.santosh.com.sunshine.utils.JSONDataExtractor;
 import android.support.v4.app.Fragment;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+import android.widget.Toast;
 
 import org.json.JSONException;
 
@@ -37,11 +44,12 @@ public class MainActivityFragment extends Fragment {
     private List<String> weekForecast;
     private ListView weekForecastListView;
     private ArrayAdapter<String> mForecastArrayAdapter;
+    public static String FORECAST_INTENT_EXTRA_KEY = "forecast";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setHasOptionsMenu(true);
+        //setHasOptionsMenu(true);
     }
 
     @Override
@@ -49,7 +57,7 @@ public class MainActivityFragment extends Fragment {
                              Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
         bindUIElements(rootView);
-        initializeWeekForecastArrayList();
+        setListeners();
         buildListView();
         return rootView;
     }
@@ -58,23 +66,34 @@ public class MainActivityFragment extends Fragment {
         weekForecastListView = (ListView)rootView.findViewById(R.id.listview_forecast);
     }
 
-    private void initializeWeekForecastArrayList(){
-        weekForecast = new ArrayList<String>()
-                                {
-                                    {
-                                        add("Today - Sunny - 88/63");
-                                        add("Tomorrow - Foggy - 70/46");
-                                        add("Weds - Cloudy - 72/63");
-                                        add("Thurs - Rainy - 64/51");
-                                        add("Fri - Foggy - 70/46");
-                                        add("Sat = Sunny - 76/68");
-                                    }
-                                };
+    private void buildListView(){
+        mForecastArrayAdapter = new ArrayAdapter<>(getActivity(),R.layout.list_item_forecast,R.id.list_item_forecast_textview,new ArrayList<String>());
+        weekForecastListView.setAdapter(mForecastArrayAdapter);
     }
 
-    private void buildListView(){
-        mForecastArrayAdapter = new ArrayAdapter<>(getActivity(),R.layout.list_item_forecast,R.id.list_item_forecast_textview,weekForecast);
-        weekForecastListView.setAdapter(mForecastArrayAdapter);
+    private void setListeners(){
+        weekForecastListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                String forecast = mForecastArrayAdapter.getItem(position);
+                Intent detailActivityIntent = new Intent(getActivity(), DetailActivity.class)
+                        .putExtra(FORECAST_INTENT_EXTRA_KEY, forecast);
+                startActivity(detailActivityIntent);
+            }
+        });
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        updateWeather();
+    }
+
+    private void updateWeather(){
+        FetchWeatherTask fetchWeatherTask = new FetchWeatherTask("json","metric",7);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        String location = prefs.getString(getString(R.string.pref_location_key), getString(R.string.pref_location_default));
+        fetchWeatherTask.execute(location);
     }
 
     @Override
@@ -87,8 +106,7 @@ public class MainActivityFragment extends Fragment {
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         if(id == R.id.action_refresh){
-            FetchWeatherTask fetchWeatherTask = new FetchWeatherTask("json","metric",7);
-            fetchWeatherTask.execute("90292");
+            updateWeather();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -104,7 +122,7 @@ public class MainActivityFragment extends Fragment {
             this.format = format;
             this.units = units;
             this.numDays = numDays;
-            jsonDataExtractor = new JSONDataExtractor();
+            jsonDataExtractor = new JSONDataExtractor(getActivity());
         }
 
         @Override
